@@ -108,9 +108,22 @@ extruder_calc_position(struct stepper_kinematics *sk, struct move *m
 {
     struct extruder_stepper *es = container_of(sk, struct extruder_stepper, sk);
     double hst = es->half_smooth_time;
-    if (!hst)
+
+    const double pressure_advance = m->axes_r.y;
+    if (!pressure_advance)
+    {
         // Pressure advance not enabled
         return m->start_pos.x + move_get_distance(m, move_time);
+    }
+
+    if (!hst)
+    {
+        // Pressure advance without smooth time
+        const double base = m->start_pos.x + pressure_advance * m->start_v;
+        const double start_v = m->start_v + pressure_advance * 2. * m->half_accel;
+        return base + (start_v + m->half_accel * move_time) * move_time;
+    }
+
     // Apply pressure advance and average over smooth_time
     double area = pa_range_integrate(m, move_time, hst);
     return m->start_pos.x + area * es->inv_half_smooth_time2;
